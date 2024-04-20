@@ -53,9 +53,9 @@ program main
         write(*, '(A)') ''//achar(27)//'[1;31mERROR::INPUT:: Unauthorized char used in input equation'//achar(27)//'[0m'
     end if
 
-    arguments(1) = '3.123 * x^0 - 1 * x^1 + 1 * x^1 + 1 * x^2 + 2 * x^2 = 0.3232 * x^3 + 0.3232 * x^32 - 42.3232 * x^1'
+    ! arguments(1) = '3.123 * x^0 - 1 * x^1 + 1 * x^1 + 1 * x^2 + 2 * x^2 = 0.3232 * x^3 + 0.3232 * x^32 - 42.3232 * x^1'
     ! arguments(1) = '1 * x^0 = 2 * x^0'
-    arguments(1) = '12312.43 * x^0 + 1 * x^1 + 2312 * x^2'
+    arguments(1) = '-12312.43 * x^0 + 1 * x^1 - 2312 * x^2'
     ! arguments(1) = '1 * x^0 + 2 * x^1 + 1 * x^2'
     str2 = ''
     do i = 1, len(arguments(1))
@@ -95,16 +95,16 @@ program main
         end if
         call check_term(term, coefficient, exponent, valid)
         if (valid .eqv. .false.) then
-            print *, 'ERROR'
+            print *, 'ERROR', __LINE__
             stop
         end if
         call check_multiple_occurrences(term, valid)
         if (valid .eqv. .false.) then
-            print *, 'ERROR'
+            print *, 'ERROR', __LINE__
             stop
         end if
         if (exponent >= max_degree) then
-            print *, 'ERROR'
+            print *, 'ERROR', __LINE__
             stop
         end if        
         polynomial(exponent+1)%coefficient = polynomial(exponent+1)%coefficient + coefficient * sign
@@ -114,12 +114,12 @@ program main
     write(*, '(A)', advance="no") "Reduced form:"
     do i = 1, max_degree
         if (polynomial(i)%coefficient /= 0 .and. polynomial(i)%coefficient > 0) then
-            write(*, '(A,F10.4,A,I0)', advance="no") ' +', polynomial(i)%coefficient, ' * x^', polynomial(i)%exponent
+            write(*, '(A,F0.8,A,I0)', advance="no") ' +', polynomial(i)%coefficient, ' * x^', polynomial(i)%exponent
             if (polynomial(i)%exponent > maxExponent) then
                 maxExponent = polynomial(i)%exponent
             end if
         else if (polynomial(i)%coefficient /= 0) then
-            write(*, '(AF10.4,A,I0)', advance="no") ' + (', polynomial(i)%coefficient, ') * x^', polynomial(i)%exponent
+            write(*, '(AF0.8,A,I0)', advance="no") ' + (', polynomial(i)%coefficient, ') * x^', polynomial(i)%exponent
             if (polynomial(i)%exponent > maxExponent) then
                 maxExponent = polynomial(i)%exponent
             end if
@@ -138,12 +138,21 @@ end program main
 
 subroutine handle_polynomial_solutions(polynomial)
     use TypesModule
-    integer :: determinant
+    real :: determinant, constant
+    real :: x_0, x_1
     type(Terms) :: polynomial(max_degree)
     determinant = polynomial(2)%coefficient * polynomial(2)%coefficient - 4 * polynomial(1)%coefficient * polynomial(3)%coefficient
-    print *, 'Δ: ', determinant
+    write(*, '(A, F0.8)') 'Δ: ', determinant
     if (determinant < 0) then
-        Print *, 'Discriminant is strictly negative, no Reals solution'
+        write(*, '(A)') 'Discriminant is strictly negative, no Reals solution'
+    else if (determinant == 0) then
+        x_0 = -polynomial(2)%coefficient / (2 * polynomial(3)%coefficient)
+        write(*, '(A, F0.8)') '𝘗(x)=0 for x_0 = ', x_0
+    else
+        determinant = sqrt(determinant)
+        x_0 = (-polynomial(2)%coefficient + determinant) / (2 * polynomial(3)%coefficient)
+        x_1 = (-polynomial(2)%coefficient - determinant) / (2 * polynomial(3)%coefficient)
+        write(*, '(A, F0.8,A, F0.8)') '𝘗(x)=0 for x_0 = ', x_0, ' and x_1 = ', x_1
     end if
 end subroutine
 
