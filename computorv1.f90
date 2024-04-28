@@ -9,6 +9,9 @@ module TypesModule
 
 end module TypesModule
 
+#define RED ''//achar(27)//'[1;31m'
+#define RESET ''//achar(27)//'[1;0m'
+#define PERROR(x) print *, RED, 'ERROR::', x, RESET
 
 program main
     use m_arguments
@@ -27,11 +30,17 @@ program main
     integer :: exponent
     integer, parameter :: max_degree = 100
     type(Terms) :: polynomial(max_degree)
+
+
+
+    ! init polynom struct
     maxExponent = 0
     do i = 1, max_degree
-        polynomial(i)%coefficient = 0 ! example: coefficient = i
-        polynomial(i)%exponent = i - 1               ! example: exponent = i - 1
+        polynomial(i)%coefficient = 0
+        polynomial(i)%exponent = i - 1
     end do
+
+    ! verify that an input is provided
     arguments = get_command_line_arguments(argc)
     if (argc < 1) then
 
@@ -48,30 +57,53 @@ program main
 
         stop
 
+    ! check for invalid input chars
     end if
     if (verify(arguments(1), "1234567890xX^*+-=. ") /= 0) then
-        write(*, '(A)') ''//achar(27)//'[1;31mERROR::INPUT:: Unauthorized char used in input equation'//achar(27)//'[0m'
+        PERROR('INPUT:: Unauthorized char used in input equation')
+        stop
     end if
+
 
     ! arguments(1) = '3.123 * x^0 - 1 * x^1 + 1 * x^1 + 1 * x^2 + 2 * x^2 = 0.3232 * x^3 + 0.3232 * x^32 - 42.3232 * x^1'
     ! arguments(1) = '1 * x^0 = 2 * x^0'
-    arguments(1) = '-12312.43 * x^0 + 1 * x^1 - 2312 * x^2'
+    ! arguments(1) = '12312.43 * x^0 + 1 * x^1 - 2312 * x^2'
     ! arguments(1) = '1 * x^0 + 2 * x^1 + 1 * x^2'
+
+
+    ! Remove extra spaces
     str2 = ''
     do i = 1, len(arguments(1))
         if (arguments(1)(i:i) /= ' ') then
             str2 = trim(str2) // trim(arguments(1)(i:i))
         endif
     end do
+    if (len_trim(str2) == 0) then
+        stop
+    endif
+
+    ! transform X into x
+    do i = 1, len_trim(str2)
+        if (str2(i:i) == 'X') then
+            str2(i:i) = 'x'
+        endif
+    end do
+
+
     is_equal_passed = 0
     i = 1
     do j = 1, len_trim(str2)
-        if (i >= len_trim(str2)) then
+
+        if (i >= len_trim(str2)) then !end of string exit
             exit
         endif
-        if (str2(i-1:i-1) == '=') then
+
+
+        if (str2(i-1:i-1) == '=') then !to know which side of the polynomial we are on
             is_equal_passed = 1
         end if
+
+
         if ((i == 1 .and. is_equal_passed == 0) .or. (str2(i-1:i-1) == '+' .and. is_equal_passed == 0) .or. (str2(i-1:i-1) == '-' .and. is_equal_passed == 1) .or. (str2(i-1:i-1) == ' ' .and. is_equal_passed == 0)) then
             sign = 1.0
         else if ((str2(i-1:i-1) == '+' .and. is_equal_passed == 1) .or. (str2(i-1:i-1) == '-' .and. is_equal_passed == 0) .or. (str2(i-1:i-1) == '=' .and. is_equal_passed == 1)) then
@@ -93,24 +125,31 @@ program main
             term = str2(i:i+bolo-2)
             i = i + bolo
         end if
+
+        print *, term
+
         call check_term(term, coefficient, exponent, valid)
         if (valid .eqv. .false.) then
-            print *, 'ERROR', __LINE__
+            print *, RED, 'ERROR::', RESET, __LINE__, 'char: ', i
             stop
         end if
         call check_multiple_occurrences(term, valid)
         if (valid .eqv. .false.) then
-            print *, 'ERROR', __LINE__
+            print *, RED, 'ERROR::', RESET, __LINE__
             stop
         end if
         if (exponent >= max_degree) then
-            print *, 'ERROR', __LINE__
+            print *, RED, 'ERROR::', RESET, __LINE__
             stop
         end if        
         polynomial(exponent+1)%coefficient = polynomial(exponent+1)%coefficient + coefficient * sign
         polynomial(exponent+1)%exponent = exponent
     end do
 
+
+
+
+    ! print reduced form from polynom struct
     write(*, '(A)', advance="no") "Reduced form:"
     do i = 1, max_degree
         if (polynomial(i)%coefficient /= 0 .and. polynomial(i)%coefficient > 0) then
@@ -125,6 +164,10 @@ program main
             end if
         end if
     end do
+
+
+
+    !handle solution output
     print *, '= 0'
     write(*, '(A, I0)') 'Polynomial Degree : ', maxExponent
     if (maxExponent > 2) then
@@ -134,26 +177,36 @@ program main
     else
         call handle_polynomial_solutions(polynomial)
     end if
+
+
+
 end program main
 
 subroutine handle_polynomial_solutions(polynomial)
     use TypesModule
     real :: determinant, constant
     real :: x_0, x_1
+    complex :: z_0, z_1
     type(Terms) :: polynomial(max_degree)
     determinant = polynomial(2)%coefficient * polynomial(2)%coefficient - 4 * polynomial(1)%coefficient * polynomial(3)%coefficient
     write(*, '(A, F0.8)') 'Δ: ', determinant
+
     if (determinant < 0) then
-        write(*, '(A)') 'Discriminant is strictly negative, no Reals solution'
+        determinant = sqrt(-determinant)
+        z_0 = cmplx(-polynomial(2)%coefficient / 2 * polynomial(3)%coefficient, determinant / 2 * polynomial(3)%coefficient)
+        z_1 = cmplx(-polynomial(2)%coefficient / 2 * polynomial(3)%coefficient, -determinant / 2 * polynomial(3)%coefficient)
+        write(*, '(A, F0.0,SP,F0.0,"i",A, F0.0,SP,F0.0,"i")') '𝘗(x)=0 for z_0 = ', z_0, ' and z_1 = ', z_1
     else if (determinant == 0) then
         x_0 = -polynomial(2)%coefficient / (2 * polynomial(3)%coefficient)
         write(*, '(A, F0.8)') '𝘗(x)=0 for x_0 = ', x_0
+
     else
         determinant = sqrt(determinant)
         x_0 = (-polynomial(2)%coefficient + determinant) / (2 * polynomial(3)%coefficient)
         x_1 = (-polynomial(2)%coefficient - determinant) / (2 * polynomial(3)%coefficient)
         write(*, '(A, F0.8,A, F0.8)') '𝘗(x)=0 for x_0 = ', x_0, ' and x_1 = ', x_1
     end if
+
 end subroutine
 
 subroutine check_term(term, coefficient, exponent, is_valid_format)
